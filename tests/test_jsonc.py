@@ -54,6 +54,18 @@ class JsoncTests(unittest.TestCase):
             {"companion": {"enabled": True}},
         )
 
+    def test_removes_preset_when_intervening_comment_contains_comma(self) -> None:
+        original = """{
+          "preset": "local" /* comment, with comma */,
+          "companion": {"enabled": true},
+        }"""
+        updated = jsonc.remove_top_level_string(original, "preset")
+
+        self.assertEqual(
+            jsonc.loads(updated),
+            {"companion": {"enabled": True}},
+        )
+
     def test_removes_last_top_level_preset_without_breaking_previous_comma(self) -> None:
         original = """{
           "companion": {"enabled": true},
