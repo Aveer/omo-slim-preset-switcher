@@ -27,11 +27,22 @@ OMO Slim already has preset management inside its TUI. This utility solves a dif
 
 ## Run
 
+From a checkout, Windows users can double-click `run.cmd`; it sets the local
+`src` directory on `PYTHONPATH` and launches without opening a persistent
+console window.
+
+For a normal Python installation:
+
 ```bash
+python -m pip install -e .
 python -m omo_slim_preset_switcher
 ```
 
-On Windows you can also double-click `run.cmd`.
+After installation the console entry point is also available:
+
+```bash
+omo-slim-presets
+```
 
 ## First run
 
