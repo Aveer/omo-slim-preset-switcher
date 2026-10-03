@@ -12,9 +12,11 @@ OMO Slim already has preset management inside its TUI. This utility solves a dif
 - Configurable OpenCode config directory.
 - Automatic discovery of project-local `.opencode/oh-my-opencode-slim.jsonc` and `.json`.
 - Correct `.jsonc` precedence when both files exist.
-- Reads available presets from the main OMO Slim config.
-- Shows the active preset for every discovered project.
-- Change one project or all currently filtered projects.
+- Reads available presets and the current global preset from the main OMO Slim config.
+- Explicit global preset control for projects that inherit the user-level setting.
+- Per-project overrides with an **Inherit global** action that removes only the local `preset` key.
+- Shows both the project override and effective preset for every discovered project.
+- Change one project or set a project-local override for all currently filtered projects.
 - Preserves JSONC comments and formatting when changing only the top-level `preset` value.
 - Atomic writes using a sibling temporary file and `os.replace`.
 - No third-party runtime dependencies; the UI uses Python's standard-library Tkinter.
@@ -67,11 +69,16 @@ User settings are stored outside the repository:
 
 ## Preset semantics
 
-For each discovered project the application edits only the top-level project-local `preset` field. It does not copy preset definitions into projects.
+The application treats **Global** and **Project** selection as separate layers.
 
-Preset definitions are read from the configured main OMO Slim config.
+- **Global preset** edits only the top-level `preset` in the configured main OMO Slim config. Projects without a local override inherit this value.
+- **Project preset** edits only the top-level `preset` in that project's existing `.opencode/oh-my-opencode-slim.jsonc` or `.json`.
+- **Inherit global** removes only the project's top-level `preset` key and preserves the rest of the project config, including JSONC comments.
+- **Bulk apply** is deliberately project-local; it never changes the global preset.
 
-If a project already has a `.jsonc` config, that file is used. Otherwise the `.json` config is used.
+Preset definitions are read from the configured main OMO Slim config. The tool does not copy preset definitions into project files.
+
+If both project `.jsonc` and `.json` exist, JSONC wins. The scanner intentionally lists projects that already contain an OMO Slim project config; it does not crawl arbitrary repositories and create configs implicitly.
 
 ## Tests
 
