@@ -198,6 +198,116 @@ def _top_level_string_value_span(
     return None
 
 
+def _top_level_string_member_span(
+    text: str, property_name: str
+) -> tuple[int, int] | None:
+    i = 0
+    depth = 0
+
+    while i < len(text):
+        char = text[i]
+
+        if text.startswith("//", i):
+            newline = text.find("\n", i + 2)
+            i = len(text) if newline < 0 else newline + 1
+            continue
+        if text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            if end < 0:
+                raise ValueError("Unterminated block comment.")
+            i = end + 2
+            continue
+
+        if char == '"':
+            key_start = i
+            end = _string_end(text, i)
+            if depth == 1:
+                try:
+                    key = json.loads(text[i:end])
+                except json.JSONDecodeError:
+                    key = None
+                if key == property_name:
+                    colon = _skip_ws_and_comments(text, end)
+                    if colon < len(text) and text[colon] == ":":
+                        value_start = _skip_ws_and_comments(text, colon + 1)
+                        if value_start < len(text) and text[value_start] == '"':
+                            return key_start, _string_end(text, value_start)
+            i = end
+            continue
+
+        if char in "{[":
+            depth += 1
+        elif char in "}]":
+            depth -= 1
+            if depth < 0:
+                raise ValueError("Malformed JSON structure.")
+
+        i += 1
+
+    return None
+
+
+def _top_level_commas(text: str) -> list[int]:
+    commas: list[int] = []
+    i = 0
+    depth = 0
+
+    while i < len(text):
+        char = text[i]
+        if text.startswith("//", i):
+            newline = text.find("\n", i + 2)
+            i = len(text) if newline < 0 else newline + 1
+            continue
+        if text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            if end < 0:
+                raise ValueError("Unterminated block comment.")
+            i = end + 2
+            continue
+        if char == '"':
+            i = _string_end(text, i)
+            continue
+        if char in "{[":
+            depth += 1
+        elif char in "}]":
+            depth -= 1
+        elif char == "," and depth == 1:
+            commas.append(i)
+        i += 1
+
+    return commas
+
+
+def remove_top_level_string(text: str, property_name: str) -> str:
+    loads(text)
+    span = _top_level_string_member_span(text, property_name)
+    if span is None:
+        return text
+
+    member_start, value_end = span
+    line_start = max(text.rfind("\n", 0, member_start), text.rfind("\r", 0, member_start)) + 1
+    remove_start = (
+        line_start
+        if text[line_start:member_start].strip() == ""
+        else member_start
+    )
+
+    after = _skip_ws_and_comments(text, value_end)
+    if after < len(text) and text[after] == ",":
+        remove_end = after + 1
+        updated = text[:remove_start] + text[remove_end:]
+    else:
+        previous = [comma for comma in _top_level_commas(text) if comma < member_start]
+        if previous:
+            comma = previous[-1]
+            updated = text[:comma] + text[comma + 1 : remove_start] + text[value_end:]
+        else:
+            updated = text[:remove_start] + text[value_end:]
+
+    loads(updated)
+    return updated
+
+
 def set_top_level_string(text: str, property_name: str, value: str) -> str:
     loads(text)
     encoded = json.dumps(value, ensure_ascii=False)
