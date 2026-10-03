@@ -80,6 +80,19 @@ class JsoncTests(unittest.TestCase):
             {"companion": {"enabled": True}},
         )
 
+    def test_remove_last_preset_preserves_previous_trailing_comment(self) -> None:
+        original = """{
+          "companion": {"enabled": true}, // keep this explanation
+          "preset": "local",
+        }
+        """
+        updated = jsonc.remove_top_level_string(original, "preset")
+
+        self.assertIn("// keep this explanation", updated)
+        parsed = jsonc.loads(updated)
+        self.assertNotIn("preset", parsed)
+        self.assertEqual(parsed["companion"], {"enabled": True})
+
     def test_inserts_missing_preset(self) -> None:
         updated = jsonc.set_top_level_string(
             """{
