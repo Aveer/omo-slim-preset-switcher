@@ -31,7 +31,12 @@ class SettingsTests(unittest.TestCase):
 
     def test_round_trip_deduplicates_roots(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
-            with patch.dict(os.environ, {"APPDATA": raw}, clear=False):
+            env = (
+                {"APPDATA": raw}
+                if os.name == "nt"
+                else {"XDG_CONFIG_HOME": raw}
+            )
+            with patch.dict(os.environ, env, clear=False):
                 save_settings(
                     {
                         "project_roots": ["/tmp/a", "/tmp/a"],
