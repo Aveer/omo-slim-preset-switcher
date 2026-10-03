@@ -73,6 +73,11 @@ def available_presets(config_path: Path) -> list[str]:
     return list(presets.keys())
 
 
+def selected_preset(config_path: Path) -> str:
+    value = read_config(config_path).get("preset", "")
+    return str(value) if isinstance(value, str) else ""
+
+
 def project_config_path(project_dir: Path) -> Path | None:
     return resolve_config(project_dir / PROJECT_CONFIG_DIR)
 
@@ -117,16 +122,9 @@ def scan_projects(roots: Iterable[Path]) -> list[ProjectConfig]:
     return sorted(found.values(), key=lambda item: str(item.project_dir).casefold())
 
 
-def write_project_preset(config_path: Path, preset: str) -> None:
-    original, has_bom = read_text(config_path)
-    updated = jsonc.set_top_level_string(original, "preset", preset)
-
-    parsed = jsonc.loads(updated) if config_path.suffix.casefold() == ".jsonc" else json.loads(updated)
-    if not isinstance(parsed, dict) or parsed.get("preset") != preset:
-        raise ValueError("Preset verification failed after update.")
-
+def _atomic_write_text(config_path: Path, text: str, has_bom: bool) -> None:
     prefix = b"\xef\xbb\xbf" if has_bom else b""
-    payload = prefix + updated.encode("utf-8")
+    payload = prefix + text.encode("utf-8")
     tmp = config_path.with_name(f"{config_path.name}.tmp")
 
     try:
@@ -141,3 +139,41 @@ def write_project_preset(config_path: Path, preset: str) -> None:
                 tmp.unlink()
             except OSError:
                 pass
+
+
+def write_preset(config_path: Path, preset: str) -> None:
+    original, has_bom = read_text(config_path)
+    updated = jsonc.set_top_level_string(original, "preset", preset)
+
+    parsed = (
+        jsonc.loads(updated)
+        if config_path.suffix.casefold() == ".jsonc"
+        else json.loads(updated)
+    )
+    if not isinstance(parsed, dict) or parsed.get("preset") != preset:
+        raise ValueError("Preset verification failed after update.")
+
+    _atomic_write_text(config_path, updated, has_bom)
+
+
+def clear_preset(config_path: Path) -> None:
+    original, has_bom = read_text(config_path)
+    updated = jsonc.remove_top_level_string(original, "preset")
+
+    parsed = (
+        jsonc.loads(updated)
+        if config_path.suffix.casefold() == ".jsonc"
+        else json.loads(updated)
+    )
+    if not isinstance(parsed, dict) or "preset" in parsed:
+        raise ValueError("Preset removal verification failed.")
+
+    _atomic_write_text(config_path, updated, has_bom)
+
+
+def write_project_preset(config_path: Path, preset: str) -> None:
+    write_preset(config_path, preset)
+
+
+def clear_project_preset(config_path: Path) -> None:
+    clear_preset(config_path)
