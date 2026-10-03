@@ -6,8 +6,19 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from .omo import ProjectConfig, available_presets, resolve_config, scan_projects, write_project_preset
+from .omo import (
+    ProjectConfig,
+    available_presets,
+    clear_project_preset,
+    resolve_config,
+    scan_projects,
+    selected_preset,
+    write_preset,
+    write_project_preset,
+)
 from .settings import load_settings, normalize_path, save_settings, settings_path
+
+INHERIT_GLOBAL = "Inherit global"
 
 
 class SettingsDialog(tk.Toplevel):
@@ -183,6 +194,7 @@ class PresetSwitcher(tk.Tk):
 
         self.filter_var = tk.StringVar()
         self.bulk_var = tk.StringVar()
+        self.global_preset_var = tk.StringVar()
         self.paths_var = tk.StringVar()
         self.status_var = tk.StringVar()
 
@@ -229,6 +241,31 @@ class PresetSwitcher(tk.Tk):
             justify="left",
         ).pack(fill="x", anchor="w", pady=(8, 10))
 
+        global_controls = ttk.Frame(outer)
+        global_controls.pack(fill="x", pady=(0, 10))
+        ttk.Label(
+            global_controls,
+            text="Global preset:",
+            font=("Segoe UI", 10, "bold"),
+        ).pack(side="left")
+        self.global_combo = ttk.Combobox(
+            global_controls,
+            textvariable=self.global_preset_var,
+            state="readonly",
+            width=28,
+        )
+        self.global_combo.pack(side="left", padx=(6, 6))
+        ttk.Button(
+            global_controls,
+            text="Apply global",
+            command=self.apply_global_preset,
+        ).pack(side="left")
+        ttk.Label(
+            global_controls,
+            text="Used by projects with no local preset override.",
+            style="Subtle.TLabel",
+        ).pack(side="left", padx=(10, 0))
+
         controls = ttk.Frame(outer)
         controls.pack(fill="x", pady=(0, 10))
 
@@ -239,7 +276,7 @@ class PresetSwitcher(tk.Tk):
             width=30,
         ).pack(side="left", padx=(6, 18))
 
-        ttk.Label(controls, text="Set all visible:").pack(side="left")
+        ttk.Label(controls, text="Set project override for visible:").pack(side="left")
         self.bulk_combo = ttk.Combobox(
             controls,
             textvariable=self.bulk_var,
@@ -334,15 +371,25 @@ class PresetSwitcher(tk.Tk):
         self.main_config_path = resolve_config(config_dir)
 
         self.presets = []
+        global_preset = ""
         if self.main_config_path is not None:
             try:
                 self.presets = available_presets(self.main_config_path)
+                global_preset = selected_preset(self.main_config_path)
             except Exception as exc:
                 messagebox.showerror(
                     "Cannot load presets",
                     f"{exc}\n\nConfig:\n{self.main_config_path}",
                     parent=self,
                 )
+
+        self.global_combo["values"] = self.presets
+        if global_preset:
+            self.global_preset_var.set(global_preset)
+        elif self.presets and self.global_preset_var.get() not in self.presets:
+            self.global_preset_var.set(self.presets[0])
+        elif not self.presets:
+            self.global_preset_var.set("")
 
         self.bulk_combo["values"] = self.presets
         if self.presets:
@@ -370,6 +417,8 @@ class PresetSwitcher(tk.Tk):
             f"{len(self.projects)} project(s)",
             f"{len(self.presets)} preset(s)",
         ]
+        if global_preset:
+            status.append(f"global: {global_preset}")
         if missing:
             status.append(f"{missing} missing root(s)")
         if self.main_config_path is None:
@@ -422,9 +471,14 @@ class PresetSwitcher(tk.Tk):
             text=project.name,
             style="Project.TLabel",
         ).pack(anchor="w")
+        effective = project.preset or self.global_preset_var.get() or "(none)"
+        override = project.preset or INHERIT_GLOBAL
         ttk.Label(
             info,
-            text=f"{project.project_dir}   [{project.config_path.suffix[1:].upper()}]",
+            text=(
+                f"{project.project_dir}   [{project.config_path.suffix[1:].upper()}]"
+                f"   Project: {override}   Effective: {effective}"
+            ),
             style="Subtle.TLabel",
         ).pack(anchor="w")
 
@@ -438,20 +492,16 @@ class PresetSwitcher(tk.Tk):
         controls = ttk.Frame(row)
         controls.pack(side="right", padx=(12, 0))
 
-        value = tk.StringVar(value=project.preset)
-        options = list(self.presets)
-        if project.preset and project.preset not in options:
-            options.insert(0, project.preset)
+        value = tk.StringVar(value=project.preset or INHERIT_GLOBAL)
+        options = [INHERIT_GLOBAL, *self.presets]
+        if project.preset and project.preset not in self.presets:
+            options.insert(1, project.preset)
 
         combo = ttk.Combobox(
             controls,
             textvariable=value,
             values=options,
-            state=(
-                "readonly"
-                if not project.error and bool(self.presets)
-                else "disabled"
-            ),
+            state=("readonly" if not project.error else "disabled"),
             width=28,
         )
         combo.pack(side="left", padx=(0, 6))
@@ -471,12 +521,22 @@ class PresetSwitcher(tk.Tk):
         ttk.Separator(self.rows).pack(fill="x")
 
     def change_preset(self, project: ProjectConfig, preset: str) -> bool:
-        if preset not in self.presets:
-            self.render_projects()
-            return False
-
         try:
-            write_project_preset(project.config_path, preset)
+            if preset == INHERIT_GLOBAL:
+                clear_project_preset(project.config_path)
+                project.preset = ""
+                self.status_var.set(
+                    f"{project.name}: project override removed → inherit global"
+                )
+            else:
+                if preset not in self.presets:
+                    self.render_projects()
+                    return False
+                write_project_preset(project.config_path, preset)
+                project.preset = preset
+                self.status_var.set(
+                    f"{project.name}: project preset → {preset}"
+                )
         except Exception as exc:
             messagebox.showerror(
                 "Cannot change preset",
@@ -486,9 +546,37 @@ class PresetSwitcher(tk.Tk):
             self.render_projects()
             return False
 
-        project.preset = preset
-        self.status_var.set(f"{project.name}: preset → {preset}")
+        self.render_projects()
         return True
+
+    def apply_global_preset(self) -> None:
+        preset = self.global_preset_var.get()
+        if preset not in self.presets or self.main_config_path is None:
+            return
+
+        if not messagebox.askyesno(
+            "Change global preset",
+            (
+                f'Set the global preset to "{preset}"?\n\n'
+                "Projects that inherit global will follow this value. "
+                "Projects with local overrides will stay unchanged."
+            ),
+            parent=self,
+        ):
+            return
+
+        try:
+            write_preset(self.main_config_path, preset)
+        except Exception as exc:
+            messagebox.showerror(
+                "Cannot change global preset",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self.status_var.set(f"Global preset → {preset}")
+        self.render_projects()
 
     def apply_bulk(self) -> None:
         preset = self.bulk_var.get()
@@ -505,7 +593,10 @@ class PresetSwitcher(tk.Tk):
 
         if not messagebox.askyesno(
             "Apply preset",
-            f'Set preset "{preset}" for {len(projects)} visible project(s)?',
+            (
+                f'Set project override "{preset}" for '
+                f'{len(projects)} visible project(s)?'
+            ),
             parent=self,
         ):
             return
@@ -530,7 +621,7 @@ class PresetSwitcher(tk.Tk):
             )
         else:
             self.status_var.set(
-                f'Set "{preset}" for {updated} project(s).'
+                f'Set project override "{preset}" for {updated} project(s).'
             )
 
     def open_project(self, path: Path) -> None:
