@@ -1,5 +1,7 @@
 @echo off
 setlocal
+set "PYTHONPATH=%~dp0src;%PYTHONPATH%"
+
 where pyw >nul 2>nul
 if %errorlevel%==0 (
     start "" pyw -3 -m omo_slim_preset_switcher
