@@ -8,8 +8,12 @@ from omo_slim_preset_switcher.omo import (
     OMO_JSON,
     OMO_JSONC,
     available_presets,
+    clear_project_preset,
+    read_config,
     resolve_config,
     scan_projects,
+    selected_preset,
+    write_preset,
     write_project_preset,
 )
 
@@ -52,6 +56,50 @@ class OmoTests(unittest.TestCase):
             self.assertEqual(len(projects), 1)
             self.assertEqual(projects[0].name, "project-a")
             self.assertEqual(projects[0].preset, "fast")
+
+    def test_global_preset_read_and_write(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / OMO_JSONC
+            path.write_text(
+                """{
+                  // global selection
+                  "preset": "fast",
+                  "presets": {
+                    "fast": {},
+                    "deep": {},
+                  },
+                }""",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(selected_preset(path), "fast")
+            write_preset(path, "deep")
+
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("// global selection", text)
+            self.assertEqual(selected_preset(path), "deep")
+
+    def test_clear_project_preset_preserves_other_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / OMO_JSONC
+            path.write_text(
+                """{
+                  // keep
+                  "preset": "local",
+                  "companion": {
+                    "enabled": true,
+                  },
+                }""",
+                encoding="utf-8",
+            )
+
+            clear_project_preset(path)
+
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("// keep", text)
+            config = read_config(path)
+            self.assertNotIn("preset", config)
+            self.assertEqual(config["companion"], {"enabled": True})
 
     def test_write_preset_preserves_jsonc_and_bom(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
