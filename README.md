@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/omo-slim-preset-switcher-banner.png" alt="OMO Slim Preset Switcher — desktop preset manager for oh-my-opencode-slim" width="100%">
+</p>
+
 # OMO Slim Preset Switcher
 
 [![CI](https://github.com/Aveer/omo-slim-preset-switcher/actions/workflows/test.yml/badge.svg)](https://github.com/Aveer/omo-slim-preset-switcher/actions/workflows/test.yml)
