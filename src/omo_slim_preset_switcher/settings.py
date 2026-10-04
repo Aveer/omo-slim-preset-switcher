@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from pathlib import Path
 
 APP_DIR_NAME = "OmoSlimPresetSwitcher"
@@ -31,6 +32,32 @@ def normalize_path(value: str | Path) -> Path:
     return Path(os.path.expandvars(str(value).strip())).expanduser()
 
 
+def path_key(value: str | Path) -> str:
+    """Return a path identity key using the current platform's case rules."""
+    return os.path.normcase(os.path.normpath(str(normalize_path(value))))
+
+
+def _normalized_roots(raw_roots: object) -> list[str]:
+    roots: list[str] = []
+    seen: set[str] = set()
+
+    if not isinstance(raw_roots, list):
+        return roots
+
+    for raw in raw_roots:
+        value = str(raw).strip()
+        if not value:
+            continue
+
+        normalized = str(normalize_path(value))
+        key = path_key(normalized)
+        if key not in seen:
+            seen.add(key)
+            roots.append(normalized)
+
+    return roots
+
+
 def default_settings() -> dict[str, object]:
     return {
         "project_roots": [],
@@ -52,20 +79,7 @@ def load_settings() -> dict[str, object]:
     if not isinstance(data, dict):
         return defaults
 
-    roots_raw = data.get("project_roots", [])
-    roots: list[str] = []
-    seen: set[str] = set()
-    if isinstance(roots_raw, list):
-        for raw in roots_raw:
-            value = str(raw).strip()
-            if not value:
-                continue
-            normalized = str(normalize_path(value))
-            key = normalized.casefold()
-            if key not in seen:
-                seen.add(key)
-                roots.append(normalized)
-
+    roots = _normalized_roots(data.get("project_roots", []))
     config_raw = data.get("opencode_config_dir", defaults["opencode_config_dir"])
     config_dir = str(normalize_path(str(config_raw)))
 
@@ -79,20 +93,7 @@ def save_settings(settings: dict[str, object]) -> None:
     path = settings_path()
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    roots_raw = settings.get("project_roots", [])
-    roots: list[str] = []
-    seen: set[str] = set()
-    if isinstance(roots_raw, list):
-        for raw in roots_raw:
-            value = str(raw).strip()
-            if not value:
-                continue
-            normalized = str(normalize_path(value))
-            key = normalized.casefold()
-            if key not in seen:
-                seen.add(key)
-                roots.append(normalized)
-
+    roots = _normalized_roots(settings.get("project_roots", []))
     config_dir = str(
         normalize_path(
             str(settings.get("opencode_config_dir", default_opencode_config_dir()))
@@ -104,17 +105,28 @@ def save_settings(settings: dict[str, object]) -> None:
         "opencode_config_dir": config_dir,
     }
 
-    tmp = path.with_name(f"{path.name}.tmp")
+    tmp_path: Path | None = None
     try:
-        with tmp.open("w", encoding="utf-8", newline="\n") as handle:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as handle:
+            tmp_path = Path(handle.name)
             json.dump(payload, handle, ensure_ascii=False, indent=2)
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(tmp, path)
+
+        os.replace(tmp_path, path)
+        tmp_path = None
     finally:
-        if tmp.exists():
+        if tmp_path is not None:
             try:
-                tmp.unlink()
-            except OSError:
+                tmp_path.unlink()
+            except FileNotFoundError:
                 pass
