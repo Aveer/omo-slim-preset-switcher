@@ -8,6 +8,20 @@
 
 A small local desktop utility for managing [oh-my-opencode-slim](https://github.com/alvinunreal/oh-my-opencode-slim) presets across multiple projects.
 
+## Compatibility
+
+**Last explicitly verified upstream baseline:** [oh-my-opencode-slim v3.0.2](https://github.com/alvinunreal/oh-my-opencode-slim/releases/tag/v3.0.2).
+
+The switcher is intentionally built around OMO Slim's documented preset/configuration contract rather than an internal API. The verified baseline includes:
+
+- user-level `oh-my-opencode-slim.jsonc` / `.json` configuration;
+- project-local `.opencode/oh-my-opencode-slim.jsonc` / `.json` overrides;
+- `.jsonc` precedence when both config formats exist;
+- the top-level `preset` selector and named `presets`;
+- `OH_MY_OPENCODE_SLIM_PRESET` as the runtime preset override.
+
+Newer OMO Slim versions may continue to work unchanged if this contract remains compatible, but **v3.0.2 is the last version explicitly checked for compatibility**. If this repository becomes unmaintained, use this baseline to judge whether a newer OMO Slim release has changed preset selection or config precedence before relying on the switcher.
+
 ## Why
 
 OMO Slim already has preset management inside its TUI. This utility solves a different problem: managing project-local preset selection across many repositories from one lightweight desktop window, including environments where OpenCode Desktop does not expose the TUI preset manager.
