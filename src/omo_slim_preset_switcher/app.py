@@ -394,12 +394,13 @@ class PresetSwitcher(tk.Tk):
         elif not self.presets:
             self.global_preset_var.set("")
 
-        self.bulk_combo["values"] = self.presets
+        bulk_options = [INHERIT_GLOBAL, *self.presets]
+        self.bulk_combo["values"] = bulk_options
         if self.presets:
-            if self.bulk_var.get() not in self.presets:
+            if self.bulk_var.get() not in bulk_options:
                 self.bulk_var.set(self.presets[0])
         else:
-            self.bulk_var.set("")
+            self.bulk_var.set(INHERIT_GLOBAL)
 
         roots = self.roots()
         self.projects = scan_projects(roots)
@@ -601,7 +602,8 @@ class PresetSwitcher(tk.Tk):
 
     def apply_bulk(self) -> None:
         preset = self.bulk_var.get()
-        if preset not in self.presets:
+        inherit = preset == INHERIT_GLOBAL
+        if not inherit and preset not in self.presets:
             return
 
         projects = [
@@ -612,12 +614,14 @@ class PresetSwitcher(tk.Tk):
         if not projects:
             return
 
+        action = (
+            "Remove project preset overrides so these projects inherit global"
+            if inherit
+            else f'Set project override "{preset}"'
+        )
         if not messagebox.askyesno(
-            "Apply preset",
-            (
-                f'Set project override "{preset}" for '
-                f'{len(projects)} visible project(s)?'
-            ),
+            "Apply project preset",
+            f"{action} for {len(projects)} visible project(s)?",
             parent=self,
         ):
             return
@@ -626,8 +630,12 @@ class PresetSwitcher(tk.Tk):
         failures: list[str] = []
         for project in projects:
             try:
-                write_project_preset(project.config_path, preset)
-                project.preset = preset
+                if inherit:
+                    clear_project_preset(project.config_path)
+                    project.preset = ""
+                else:
+                    write_project_preset(project.config_path, preset)
+                    project.preset = preset
                 updated += 1
             except Exception as exc:
                 failures.append(f"{project.name}: {exc}")
@@ -639,6 +647,10 @@ class PresetSwitcher(tk.Tk):
                 f"Updated: {updated}\nFailed: {len(failures)}\n\n"
                 + "\n".join(failures[:12]),
                 parent=self,
+            )
+        elif inherit:
+            self.status_var.set(
+                f"Removed project overrides for {updated} project(s) → inherit global."
             )
         else:
             self.status_var.set(
