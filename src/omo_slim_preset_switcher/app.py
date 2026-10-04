@@ -10,6 +10,7 @@ from .omo import (
     ProjectConfig,
     available_presets,
     clear_project_preset,
+    environment_preset,
     resolve_config,
     scan_projects,
     selected_preset,
@@ -191,6 +192,7 @@ class PresetSwitcher(tk.Tk):
         self.presets: list[str] = []
         self.projects: list[ProjectConfig] = []
         self.main_config_path: Path | None = None
+        self.env_preset = ""
 
         self.filter_var = tk.StringVar()
         self.bulk_var = tk.StringVar()
@@ -372,6 +374,7 @@ class PresetSwitcher(tk.Tk):
 
         self.presets = []
         global_preset = ""
+        self.env_preset = environment_preset()
         if self.main_config_path is not None:
             try:
                 self.presets = available_presets(self.main_config_path)
@@ -419,6 +422,8 @@ class PresetSwitcher(tk.Tk):
         ]
         if global_preset:
             status.append(f"global: {global_preset}")
+        if self.env_preset:
+            status.append(f"env override: {self.env_preset}")
         if missing:
             status.append(f"{missing} missing root(s)")
         if self.main_config_path is None:
@@ -471,13 +476,23 @@ class PresetSwitcher(tk.Tk):
             text=project.name,
             style="Project.TLabel",
         ).pack(anchor="w")
-        effective = project.preset or self.global_preset_var.get() or "(none)"
+        effective = (
+            self.env_preset
+            or project.preset
+            or self.global_preset_var.get()
+            or "(none)"
+        )
         override = project.preset or INHERIT_GLOBAL
         ttk.Label(
             info,
             text=(
                 f"{project.project_dir}   [{project.config_path.suffix[1:].upper()}]"
                 f"   Project: {override}   Effective: {effective}"
+                + (
+                    f"   [env override]"
+                    if self.env_preset
+                    else ""
+                )
             ),
             style="Subtle.TLabel",
         ).pack(anchor="w")
@@ -575,7 +590,13 @@ class PresetSwitcher(tk.Tk):
             )
             return
 
-        self.status_var.set(f"Global preset → {preset}")
+        if self.env_preset:
+            self.status_var.set(
+                f'Global preset → {preset} · effective remains "{self.env_preset}" '
+                "because OH_MY_OPENCODE_SLIM_PRESET is set"
+            )
+        else:
+            self.status_var.set(f"Global preset → {preset}")
         self.render_projects()
 
     def apply_bulk(self) -> None:
