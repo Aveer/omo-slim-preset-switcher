@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,9 +8,37 @@ version = "0.1.0"
 description = "Lightweight multi-project preset manager for oh-my-opencode-slim"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+authors = [
+  { name = "Aveer" },
+]
+keywords = [
+  "opencode",
+  "oh-my-opencode-slim",
+  "preset-manager",
+  "tkinter",
+  "desktop",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
 dependencies = []
 
-[project.scripts]
+[project.urls]
+Homepage = "https://github.com/Aveer/omo-slim-preset-switcher"
+Repository = "https://github.com/Aveer/omo-slim-preset-switcher"
+Issues = "https://github.com/Aveer/omo-slim-preset-switcher/issues"
+"Upstream OMO Slim" = "https://github.com/alvinunreal/oh-my-opencode-slim"
+
+[project.gui-scripts]
 omo-slim-presets = "omo_slim_preset_switcher.app:main"
 
 [tool.setuptools.packages.find]
