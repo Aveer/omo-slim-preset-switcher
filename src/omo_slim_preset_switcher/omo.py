@@ -121,9 +121,9 @@ def scan_projects(roots: Iterable[Path]) -> list[ProjectConfig]:
                     error = str(exc)
 
                 try:
-                    key = str(config_path.resolve()).casefold()
+                    key = os.path.normcase(str(config_path.resolve()))
                 except OSError:
-                    key = str(config_path.absolute()).casefold()
+                    key = os.path.normcase(str(config_path.absolute()))
 
                 found[key] = ProjectConfig(
                     name=current.name or str(current),
