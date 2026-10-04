@@ -17,7 +17,13 @@ from .omo import (
     write_preset,
     write_project_preset,
 )
-from .settings import load_settings, normalize_path, save_settings, settings_path
+from .settings import (
+    load_settings,
+    normalize_path,
+    path_key,
+    save_settings,
+    settings_path,
+)
 
 INHERIT_GLOBAL = "Inherit global"
 
@@ -134,10 +140,10 @@ class SettingsDialog(tk.Toplevel):
 
         normalized = str(normalize_path(selected))
         existing = {
-            self.roots_list.get(index).casefold()
+            path_key(self.roots_list.get(index))
             for index in range(self.roots_list.size())
         }
-        if normalized.casefold() not in existing:
+        if path_key(normalized) not in existing:
             self.roots_list.insert("end", normalized)
 
     def remove_root(self) -> None:
@@ -160,7 +166,7 @@ class SettingsDialog(tk.Toplevel):
         seen: set[str] = set()
         for index in range(self.roots_list.size()):
             value = str(normalize_path(self.roots_list.get(index)))
-            key = value.casefold()
+            key = path_key(value)
             if key not in seen:
                 seen.add(key)
                 roots.append(value)
