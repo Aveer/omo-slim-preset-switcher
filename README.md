@@ -16,7 +16,7 @@ OMO Slim already has preset management inside its TUI. This utility solves a dif
 - Explicit global preset control for projects that inherit the user-level setting.
 - Per-project overrides with an **Inherit global** action that removes only the local `preset` key.
 - Shows both the project override and effective preset for every discovered project.
-- Change one project or set a project-local override for all currently filtered projects.
+- Change one project, bulk-set project overrides, or bulk-return visible projects to **Inherit global**.
 - Preserves JSONC comments and formatting when changing only the top-level `preset` value.
 - Atomic writes use a securely created unique sibling temporary file plus `os.replace`; predictable temp-path symlinks are never followed.
 - No third-party runtime dependencies; the UI uses Python's standard-library Tkinter.
@@ -74,7 +74,7 @@ The application treats **Global** and **Project** selection as separate layers.
 - **Global preset** edits only the top-level `preset` in the configured main OMO Slim config. Projects without a local override inherit this value.
 - **Project preset** edits only the top-level `preset` in that project's existing `.opencode/oh-my-opencode-slim.jsonc` or `.json`.
 - **Inherit global** removes only the project's top-level `preset` key and preserves the rest of the project config, including JSONC comments.
-- **Bulk apply** is deliberately project-local; it never changes the global preset.
+- **Bulk apply** is deliberately project-local: it can set one override across visible projects or remove their overrides via **Inherit global**, but it never changes the global preset.
 
 Preset definitions are read from the configured main OMO Slim config. The tool does not copy preset definitions into project files.
 
