@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from omo_slim_preset_switcher.omo import (
     OMO_JSON,
     OMO_JSONC,
     available_presets,
     clear_project_preset,
+    environment_preset,
     read_config,
     resolve_config,
     scan_projects,
@@ -78,6 +81,41 @@ class OmoTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertIn("// global selection", text)
             self.assertEqual(selected_preset(path), "deep")
+
+    def test_selected_preset_interpolates_environment_placeholder(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / OMO_JSON
+            path.write_text(
+                '{"preset":"{env:OMO_TEST_CHOICE}","presets":{"deep":{}}}',
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {"OMO_TEST_CHOICE": "deep"}, clear=False):
+                self.assertEqual(selected_preset(path), "deep")
+
+    def test_environment_preset_reads_runtime_override(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"OH_MY_OPENCODE_SLIM_PRESET": "  runtime  "},
+            clear=False,
+        ):
+            self.assertEqual(environment_preset(), "runtime")
+
+    @unittest.skipIf(os.name == "nt", "symlink creation may require elevated Windows privileges")
+    def test_atomic_write_does_not_follow_predictable_tmp_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            path = root / OMO_JSON
+            victim = root / "victim.txt"
+            predictable_tmp = root / f"{OMO_JSON}.tmp"
+            path.write_text('{"preset":"old"}', encoding="utf-8")
+            victim.write_text("do-not-touch", encoding="utf-8")
+            predictable_tmp.symlink_to(victim)
+
+            write_preset(path, "new")
+
+            self.assertEqual(victim.read_text(encoding="utf-8"), "do-not-touch")
+            self.assertEqual(selected_preset(path), "new")
+            self.assertTrue(predictable_tmp.is_symlink())
 
     def test_clear_project_preset_preserves_other_settings(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
