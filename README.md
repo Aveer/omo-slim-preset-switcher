@@ -18,7 +18,7 @@ OMO Slim already has preset management inside its TUI. This utility solves a dif
 - Shows both the project override and effective preset for every discovered project.
 - Change one project or set a project-local override for all currently filtered projects.
 - Preserves JSONC comments and formatting when changing only the top-level `preset` value.
-- Atomic writes using a sibling temporary file and `os.replace`.
+- Atomic writes use a securely created unique sibling temporary file plus `os.replace`; predictable temp-path symlinks are never followed.
 - No third-party runtime dependencies; the UI uses Python's standard-library Tkinter.
 - No machine-specific paths are stored in the repository.
 
@@ -77,6 +77,14 @@ The application treats **Global** and **Project** selection as separate layers.
 - **Bulk apply** is deliberately project-local; it never changes the global preset.
 
 Preset definitions are read from the configured main OMO Slim config. The tool does not copy preset definitions into project files.
+
+For the displayed **Effective** preset, the app follows OMO Slim precedence:
+
+1. `OH_MY_OPENCODE_SLIM_PRESET` when set;
+2. project-local `preset`;
+3. global/user `preset`.
+
+Top-level preset strings using OMO's `{env:NAME}` syntax are interpolated for display. When `OH_MY_OPENCODE_SLIM_PRESET` is active, Project/Global config edits are still allowed but the UI marks that the runtime effective preset remains masked by the environment override.
 
 If both project `.jsonc` and `.json` exist, JSONC wins. The scanner intentionally lists projects that already contain an OMO Slim project config; it does not crawl arbitrary repositories and create configs implicitly.
 
