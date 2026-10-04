@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -26,6 +28,16 @@ PRUNE_DIRS = {
     ".next",
     ".cache",
 }
+
+_ENV_PATTERN = re.compile(r"\{env:([^}]+)\}")
+
+
+def interpolate_env(value: str) -> str:
+    return _ENV_PATTERN.sub(lambda match: os.environ.get(match.group(1), ""), value)
+
+
+def environment_preset() -> str:
+    return os.environ.get("OH_MY_OPENCODE_SLIM_PRESET", "").strip()
 
 
 @dataclass(slots=True)
@@ -75,7 +87,7 @@ def available_presets(config_path: Path) -> list[str]:
 
 def selected_preset(config_path: Path) -> str:
     value = read_config(config_path).get("preset", "")
-    return str(value) if isinstance(value, str) else ""
+    return interpolate_env(value).strip() if isinstance(value, str) else ""
 
 
 def project_config_path(project_dir: Path) -> Path | None:
@@ -97,7 +109,12 @@ def scan_projects(roots: Iterable[Path]) -> list[ProjectConfig]:
             if config_path is not None:
                 try:
                     config = read_config(config_path)
-                    preset = str(config.get("preset", "") or "")
+                    raw_preset = config.get("preset", "")
+                    preset = (
+                        interpolate_env(raw_preset).strip()
+                        if isinstance(raw_preset, str)
+                        else ""
+                    )
                     error = ""
                 except Exception as exc:
                     preset = ""
@@ -125,19 +142,28 @@ def scan_projects(roots: Iterable[Path]) -> list[ProjectConfig]:
 def _atomic_write_text(config_path: Path, text: str, has_bom: bool) -> None:
     prefix = b"\xef\xbb\xbf" if has_bom else b""
     payload = prefix + text.encode("utf-8")
-    tmp = config_path.with_name(f"{config_path.name}.tmp")
+    config_path.parent.mkdir(parents=True, exist_ok=True)
 
+    tmp_path: Path | None = None
     try:
-        with tmp.open("wb") as handle:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            prefix=f".{config_path.name}.",
+            suffix=".tmp",
+            dir=config_path.parent,
+            delete=False,
+        ) as handle:
+            tmp_path = Path(handle.name)
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(tmp, config_path)
+        os.replace(tmp_path, config_path)
+        tmp_path = None
     finally:
-        if tmp.exists():
+        if tmp_path is not None:
             try:
-                tmp.unlink()
-            except OSError:
+                tmp_path.unlink()
+            except FileNotFoundError:
                 pass
 
 
