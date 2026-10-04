@@ -1,5 +1,7 @@
 # OMO Slim Preset Switcher
 
+[![CI](https://github.com/Aveer/omo-slim-preset-switcher/actions/workflows/test.yml/badge.svg)](https://github.com/Aveer/omo-slim-preset-switcher/actions/workflows/test.yml)
+
 A small local desktop utility for managing [oh-my-opencode-slim](https://github.com/alvinunreal/oh-my-opencode-slim) presets across multiple projects.
 
 ## Why
@@ -18,7 +20,8 @@ OMO Slim already has preset management inside its TUI. This utility solves a dif
 - Shows both the project override and effective preset for every discovered project.
 - Change one project, bulk-set project overrides, or bulk-return visible projects to **Inherit global**.
 - Preserves JSONC comments and formatting when changing only the top-level `preset` value.
-- Atomic writes use a securely created unique sibling temporary file plus `os.replace`; predictable temp-path symlinks are never followed.
+- Atomic config and app-settings writes use securely created unique sibling temporary files plus `os.replace`.
+- Path deduplication follows the host platform's case-sensitivity rules.
 - No third-party runtime dependencies; the UI uses Python's standard-library Tkinter.
 - No machine-specific paths are stored in the repository.
 
@@ -27,23 +30,40 @@ OMO Slim already has preset management inside its TUI. This utility solves a dif
 - Python 3.11+
 - Tkinter 8.6+ (included with the standard Windows Python installer)
 
+CI currently validates Python 3.11 and 3.14 on both Windows and Ubuntu.
+
 ## Run
 
-From a checkout, Windows users can double-click `run.cmd`; it sets the local
-`src` directory on `PYTHONPATH` and launches without opening a persistent
-console window.
+### From a checkout on Windows
 
-For a normal Python installation:
+Double-click `run.cmd`. It adds the local `src` directory to `PYTHONPATH` and launches the GUI without leaving a persistent console window.
+
+You can also run the module directly:
 
 ```bash
-python -m pip install -e .
 python -m omo_slim_preset_switcher
 ```
 
-After installation the console entry point is also available:
+### Install as a Python application
+
+From a checkout:
+
+```bash
+python -m pip install .
+```
+
+The installed GUI entry point is:
 
 ```bash
 omo-slim-presets
+```
+
+On Windows this is installed as a GUI script, so launching it does not require a console window.
+
+For development, an editable install still works:
+
+```bash
+python -m pip install -e .
 ```
 
 ## First run
@@ -93,6 +113,12 @@ If both project `.jsonc` and `.json` exist, JSONC wins. The scanner intentionall
 ```bash
 python -m unittest discover -s tests -v
 ```
+
+The GitHub Actions matrix also verifies a normal installed package, the GUI entry point, and Tkinter import on Windows.
+
+## Releases
+
+Tagged releases build both a wheel and source distribution and publish them to GitHub Releases. Runtime dependencies remain empty.
 
 ## Scope
 
